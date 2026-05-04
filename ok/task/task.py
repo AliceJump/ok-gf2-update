@@ -3,6 +3,7 @@ import subprocess
 import threading
 import time
 from typing import List
+from PySide6.QtCore import QCoreApplication
 
 import cv2
 from qfluentwidgets import FluentIcon
@@ -880,6 +881,8 @@ class OCR(FindFeature):
         except Exception as e:
             logger.error('onnx_ocr', e)
             self.screenshot('onnx_ocr_exception', frame=image)
+            if 'ZE_RESULT_ERROR_DEVICE_LOST' in str(e):
+                raise Exception(QCoreApplication.translate('Task', 'NPU inferring Error, you might need to update the Intel NPU driver!'))
             raise e
         detected_boxes = []
         # logger.debug(f'rapid_ocr result {result}')
@@ -1054,6 +1057,7 @@ class BaseTask(OCR):
         self.exit_after_task = False
         self.info = {}
         self.default_config = {}
+        self.default_config_group = {}
         self.global_config_names = []
         self.config_description = {}
         self.config_type = {}
@@ -1101,7 +1105,7 @@ class BaseTask(OCR):
         pass
 
     def tr(self, message):
-        return self.app.tr(message)
+        return self._app.tr(message)
 
     def should_trigger(self):
         if self.trigger_interval == 0:
@@ -1190,7 +1194,7 @@ class BaseTask(OCR):
         self.logger.error(message, exception)
         if exception is not None:
             if len(exception.args) > 0:
-                message += exception.args[0]
+                message += str(exception.args[0])
             else:
                 message += str(exception)
         self.info_set("Error", message)
@@ -1243,6 +1247,7 @@ class BaseTask(OCR):
         self.info[key] = self.info.get(key, 0) + count
 
     def load_config(self):
+        # default_config_group is UI-only grouping metadata; it does not alter config schema.
         self.config = Config(self.__class__.__name__, self.default_config, validator=self.validate)
 
     def validate(self, key, value):
