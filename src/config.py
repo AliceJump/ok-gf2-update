@@ -3,7 +3,7 @@ import os
 import numpy as np
 from ok import Config
 
-version = "v1.2.58"
+version = "v1.2.59"
 # 不需要修改version, Github Action打包会自动修改
 
 config = {
