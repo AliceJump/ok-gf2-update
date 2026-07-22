@@ -7,19 +7,25 @@ from ok import Logger
 from ok.device.capture import BaseWindowsCaptureMethod, BrowserCaptureMethod
 from ok.gui.Communicate import communicate
 from ok.gui.util.Alert import alert_error
-from ok.util.process import is_admin, execute
+from ok.util.process import is_admin, execute, WINDOWS_START_METHOD_START
 
 logger = Logger.get_logger(__name__)
 
 
 class StartController(QObject):
+    STARTED_WINDOW_MIN_SIZE = (100, 100)
+    STARTED_WINDOW_STABLE_SECONDS = 2
+    STARTED_WINDOW_POLL_INTERVAL = 0.2
+
     def __init__(self, app_config, exit_event):
         super().__init__()
         self.config = app_config
         self.exit_event = exit_event
         self.handler = Handler(exit_event, __name__)
         self.start_timeout = app_config.get('start_timeout', 60)
-        self.start_exe = (app_config.get('windows') or {}).get('start_exe', True)
+        windows_config = app_config.get('windows') or {}
+        self.start_exe = windows_config.get('start_exe', True)
+        self.start_method = windows_config.get('start_method', WINDOWS_START_METHOD_START)
 
     @staticmethod
     def _mark_task_enabled(task):
@@ -72,7 +78,7 @@ class StartController(QObject):
 
         try:
             if self.start_exe:
-                if not self.start_device():
+                if not self.start_device(initial_refresh_done=True):
                     return False
             else:
                 logger.info('windows.start_exe is False, skip start_device')
@@ -103,10 +109,13 @@ class StartController(QObject):
             communicate.starting_emulator.emit(True, self.tr(f'Start failed: {e}'), 0)
             return False
 
-    def _wait_until_device_ready(self):
+    def _wait_until_device_ready(self, refresh_first=True):
         wait_until = time.time() + self.start_timeout
+        first_check = True
         while not self.exit_event.is_set():
-            og.device_manager.do_refresh(True)
+            if refresh_first or not first_check:
+                og.device_manager.do_refresh(True)
+            first_check = False
             error = self.check_device_error()
             if error is None:
                 return True
@@ -119,7 +128,38 @@ class StartController(QObject):
             time.sleep(2)
         return False
 
-    def start_device(self):
+    def _wait_until_started_window_stable(self):
+        wait_until = time.monotonic() + self.start_timeout
+        stable_size = None
+        stable_since = None
+        min_width, min_height = self.STARTED_WINDOW_MIN_SIZE
+
+        while not self.exit_event.is_set():
+            hwnd_window = getattr(og.device_manager, 'hwnd_window', None)
+            if hwnd_window is not None:
+                hwnd_window.do_update_window_size()
+                size = (hwnd_window.width, hwnd_window.height)
+                if hwnd_window.hwnd and size[0] >= min_width and size[1] >= min_height:
+                    now = time.monotonic()
+                    if size != stable_size:
+                        logger.info(f'waiting for started window to stabilize, current size {size[0]}x{size[1]}')
+                        stable_size = size
+                        stable_since = now
+                    elif now - stable_since >= self.STARTED_WINDOW_STABLE_SECONDS:
+                        logger.info(f'started window size stable for {self.STARTED_WINDOW_STABLE_SECONDS}s: {size[0]}x{size[1]}')
+                        return True
+                else:
+                    stable_size = None
+                    stable_since = None
+
+            remaining_time = wait_until - time.monotonic()
+            if remaining_time <= 0:
+                communicate.starting_emulator.emit(True, self.tr('Start game timeout!'), 0)
+                return False
+            time.sleep(self.STARTED_WINDOW_POLL_INTERVAL)
+        return False
+
+    def start_device(self, initial_refresh_done=False):
         device = og.device_manager.get_preferred_device()
         logger.info(f'start_device: {device}')
 
@@ -137,8 +177,10 @@ class StartController(QObject):
                 dx11_config = og.global_config.get_config('Launch with DX11')
                 if dx11_config and dx11_config.get('Launch with DX11'):
                     args = "-dx11 -d3d11 -force-d3d11"
-                if not execute(path, arguments=args):
+                if not execute(path, arguments=args, start_method=self.start_method):
                     communicate.starting_emulator.emit(True, self.tr("Start game failed, please start game first"), 0)
+                    return False
+                if device['device'] == "windows" and not self._wait_until_started_window_stable():
                     return False
                 if not self._wait_until_device_ready():
                     return False
@@ -146,22 +188,37 @@ class StartController(QObject):
                 communicate.starting_emulator.emit(True,
                                                    self.tr('Game path does not exist, Please open game manually!'), 0)
                 return False
-        elif not self._wait_until_device_ready():
+        elif not self._wait_until_device_ready(refresh_first=not initial_refresh_done):
             return False
         communicate.starting_emulator.emit(True, None, 0)
         return True
 
     def check_gpu_driver_post_processing(self):
         try:
-            from ok.util.gpu_driver_settings import is_gpu_post_processing_enabled
-            enabled = is_gpu_post_processing_enabled()
+            from ok.util.gpu_driver_settings import get_enabled_gpu_driver_post_processing
+            device_manager = getattr(og, 'device_manager', None)
+            hwnd_window = getattr(device_manager, 'hwnd_window', None)
+            target_exe_path = getattr(hwnd_window, 'exe_full_path', None) if hwnd_window else None
+            target_hwnd = getattr(hwnd_window, 'hwnd', None) if hwnd_window else None
+            if not target_exe_path and device_manager:
+                device = device_manager.get_preferred_device()
+                target_exe_path = device.get('full_path') if device else None
+            enabled_features = get_enabled_gpu_driver_post_processing(target_exe_path, target_hwnd)
         except Exception as e:
             logger.error(f'check_gpu_driver_post_processing exception: {e}', e)
             return
 
-        if enabled:
+        if enabled_features:
+            warning_lines = [
+                self.tr('{vendor} {feature} is enabled and may cause malfunctions!').format(
+                    vendor=feature.vendor,
+                    feature=feature.feature,
+                )
+                for feature in enabled_features
+            ]
+            logger.warning('\n'.join(warning_lines))
             communicate.notification.emit(
-                self.tr('NVIDIA/AMD filters or sharpening are enabled and may cause malfunctions!'),
+                '\n'.join(warning_lines),
                 self.tr('GPU Driver Warning'),
                 True,
                 True,
