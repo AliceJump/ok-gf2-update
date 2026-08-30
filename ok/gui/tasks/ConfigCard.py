@@ -49,7 +49,7 @@ class ConfigContentMixin:
         # initialize layout
         self.viewLayout.setSpacing(0)
         self.viewLayout.setAlignment(Qt.AlignTop)
-        self.viewLayout.setContentsMargins(10, 0, 10, 0)
+        self.viewLayout.setContentsMargins(6, 4, 6, 8)
         self.sub_configs_rules = self.__collect_sub_configs_rules()
         self.sub_configs_controlled_keys = self.__collect_sub_configs_controlled_keys()
         if not self.config or not (self.config.has_user_config() or self.default_config or self.config_type):
@@ -319,8 +319,15 @@ class ConfigCard(ConfigContentMixin, ExpandSettingCard):
     def __init__(self, task, name, config, description, default_config, config_description,
                  config_type, config_icon):
 
+        self._expand_enabled = True
         super().__init__(config_icon or FluentIcon.INFO, og.app.tr(name), og.app.tr(description))
         self._init_config_content(task, config, default_config, config_description, config_type)
 
+    def setExpand(self, isExpand: bool):
+        if isExpand and not self._expand_enabled:
+            return
+        super().setExpand(isExpand)
+
     def _on_empty_config_content(self):
+        self._expand_enabled = False
         self.card.expandButton.hide()
