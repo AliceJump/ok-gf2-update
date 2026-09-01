@@ -98,7 +98,7 @@ class DailyTask(CommunityMixin, BaseGfTask):
             '吃饭': '1.0',
             "社区每日": False,
             '邮件': True,
-            '情报/战前补给': False,
+            '情报和战前补给': True,
             '闪耀星愿': False,
             '活动自律': True,
             '活动层': True,
@@ -140,6 +140,9 @@ class DailyTask(CommunityMixin, BaseGfTask):
             "自动刷体力": ["体力本"],
             "班组": ["尘烟"],
         })
+        for group, keys in self.default_config_group.items():
+            self.config_type.update({group: {'sub_configs': {True: keys}}})
+
     def run(self):
         if not self.config.get('已确认启用游戏内全局自动功能'):
             self.confirm_auto_battle_up()
@@ -150,7 +153,7 @@ class DailyTask(CommunityMixin, BaseGfTask):
                 time_out=90
             )),
             ('邮件', self.mail),
-            ('情报/战前补给', self.activities),
+            ('情报和战前补给', self.activities),
             ('活动自律', self.activity),
             ('活动层', self.free_time_layer),
             ('公共区/调度室', self.gongongqu),
@@ -308,7 +311,7 @@ class DailyTask(CommunityMixin, BaseGfTask):
         reward_activities = ['情报补给', '战前补给']
         for reward_activity in reward_activities:
             if self.wait_click_ocr(match=reward_activity, box=self.box.left, time_out=3, raise_if_not_found=False):
-                while self.wait_click_ocr(match=['领取'], box=self.box.bottom_right, time_out=3,
+                while self.wait_click_ocr(match=['领取'], box=self.box.right, time_out=3,
                                         raise_if_not_found=False,
                                         after_sleep=0.2):
                     self.wait_pop_up(time_out=6, count=1)
