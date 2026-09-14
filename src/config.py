@@ -3,7 +3,7 @@ import os
 import numpy as np
 from ok import Config
 
-version = "v1.2.72"
+version = "v1.2.73"
 # 不需要修改version, Github Action打包会自动修改
 
 config = {
@@ -72,5 +72,8 @@ config = {
         ["src.tasks.TestStartGame", "TestStartGame"],
         ["src.tasks.TestTask", "TestTask"],
         ["ok", "DiagnosisTask"],
+    ],
+    "custom_tabs": [  # 自定义界面页
+        ["src.gui.AccountConfigTab", "AccountConfigTab"],
     ],
 }
