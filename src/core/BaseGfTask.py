@@ -4,6 +4,7 @@ import time
 from typing import Union, List
 
 from ok import BaseTask, find_boxes_by_name, Box, Logger
+from src.core.base_mixin.runtime_mixin import RuntimeMixin
 from src.image.frame_processs import isolate_by_hsv_ranges
 from functools import partial
 from src.image.hsv_config import HSVRange as hR
@@ -25,7 +26,9 @@ def parse_time_option(option: str) -> list[float]:
     return [float(x) for x in option.split('-')]
 
 
-class BaseGfTask(BaseTask):
+class BaseGfTask(RuntimeMixin, BaseTask):
+    """任务基类：RuntimeMixin 提供模板匹配入口重写，BaseTask 提供框架能力。"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.roles_dict = {
@@ -59,13 +62,14 @@ class BaseGfTask(BaseTask):
         """
         return isolate_by_hsv_ranges(frame, ranges, invert, kernel_size)
 
-    def make_hsv_isolator(self, ranges):
-        """
-        :param ranges: HSV 区间列表
-
-        作用：生成固定 HSV 范围的图像处理函数。
-        """
-        return partial(self.isolate_by_hsv_ranges, ranges=ranges)
+    def make_hsv_isolator(self, ranges, invert=True, kernel_size=2):
+        """返回一个可直接调用的 HSV 过滤函数"""
+        return lambda frame: isolate_by_hsv_ranges(
+            frame,
+            ranges,
+            invert=invert,
+            kernel_size=kernel_size,
+        )
 
     def get_role_by_name(self, name):
         return next((k for k, v in self.roles_dict.items() if name in v), None)
@@ -259,16 +263,20 @@ class BaseGfTask(BaseTask):
         if total >= 2:
             return True
         # if not self.do_handle_alert()[0]:
-        if self.ocr(match=re.compile('^是否离开活动层'), log=True):
-            self.wait_click_ocr(match='确认', after_sleep=2)
+        if self.ocr(match=re.compile('^是否离开活动层'), box=self.box.center, log=True):
+            self.wait_click_ocr(match='确认', after_sleep=2, box=self.box.bottom_right)
+            return False
         if box := self.ocr(box=self.box.bottom, match=["点击开始", "点击空白处关闭", "取消"],
                            log=True):
             self.click(box, after_sleep=2)
             return False
         if esc:
+            if result:= self.find_feature(feature=[fL.back_home, fL.back_home_light], horizontal_variance=0.02, vertical_variance=0.002):
+                self.click(result, after_sleep=2)
+                return False
             self.back(after_sleep=2)
         self.next_frame()
-        return None
+        return False
 
     def click(self, x: Union[float, Box, List[Box]] = 0.0, y: Union[float, int] = 0.0, move_back=False, name=None,
               interval=-1, move=True,
