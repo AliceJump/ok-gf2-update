@@ -251,3 +251,62 @@ msgstr "删除任务"
 
 msgid "Are you sure you want to delete task"
 msgstr "确定要删除任务"
+msgid "拂晓之光补给包奖励"
+msgstr "拂晓之光补给包奖励"
+
+msgid "远航巡录领取时自动选择的补给包奖励，默认数据链路"
+msgstr "远航巡录领取时自动选择的补给包奖励，默认数据链路"
+
+msgid "数据链路"
+msgstr "数据链路"
+
+msgid "坍塌晶条"
+msgstr "坍塌晶条"
+
+msgid "增域存量条T2"
+msgstr "增域存量条T2"
+
+msgid "大容量内存条"
+msgstr "大容量内存条"
+
+msgid "转录导体·序三"
+msgstr "转录导体·序三"
+
+msgid "萨狄斯金"
+msgstr "萨狄斯金"
+
+msgid "活动层浇花"
+msgstr "活动层浇花"
+
+msgid "在喝水和吃饭后浇灌栽培植物；已浇灌则跳过，不施肥"
+msgstr "在喝水和吃饭后浇灌栽培植物；已浇灌则跳过，不施肥"
+
+msgid "待核查"
+msgstr "待核查"
+
+msgid "待核查任务:"
+msgstr "待核查任务:"
+
+msgid "待核查的任务列表"
+msgstr "待核查的任务列表"
+
+msgid "任务 {key} 结果待核查"
+msgstr "任务 {key} 结果待核查"
+
+msgid "每日行动"
+msgstr "每日行动"
+
+msgid "巡录奖励"
+msgstr "巡录奖励"
+
+msgid "未检查"
+msgstr "未检查"
+
+msgid "领取已确认／已无可领取奖励"
+msgstr "领取已确认／已无可领取奖励"
+
+msgid "执行失败"
+msgstr "执行失败"
+
+msgid "待核查：缺少领取结果证据"
+msgstr "待核查：缺少领取结果证据"
