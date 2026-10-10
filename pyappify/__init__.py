@@ -58,13 +58,14 @@ except ImportError:
 
 
 def find_pyappify_executable(start_dir=None, environ=None):
-    """Find the launcher configured by PyAppify or in a parent directory."""
+    """Find the configured launcher or an app launcher above ``working``."""
     environ = os.environ if environ is None else environ
     configured = environ.get("PYAPPIFY_EXECUTABLE")
     if configured:
         configured_path = Path(configured).expanduser()
         if configured_path.is_file():
             return str(configured_path.resolve())
+        return None
 
     current = Path(start_dir or os.getcwd()).expanduser()
     if current.is_file():
@@ -74,12 +75,37 @@ def find_pyappify_executable(start_dir=None, environ=None):
     except OSError:
         current = current.absolute()
 
-    executable_names = ("pyappify.exe", "pyappify")
-    for directory in (current,) + tuple(current.parents):
-        for executable_name in executable_names:
-            candidate = directory / executable_name
-            if candidate.is_file():
-                return str(candidate.resolve())
+    working_directory = next(
+        (
+            directory
+            for directory in (current,) + tuple(current.parents)
+            if directory.name.casefold() == "working" and directory.parent.name
+        ),
+        None,
+    )
+    if working_directory is None:
+        return None
+
+    app_name = working_directory.parent.name
+    apps_directory = working_directory.parent.parent
+    data_directory = apps_directory.parent
+    if apps_directory.name.casefold() != "apps" or data_directory.name.casefold() != "data":
+        return None
+
+    app_root = data_directory.parent
+    executable_name = "{}.exe".format(app_name)
+    search_directories = []
+    directory = working_directory
+    while True:
+        search_directories.append(directory)
+        if directory == app_root:
+            break
+        directory = directory.parent
+
+    for directory in search_directories:
+        candidate = directory / executable_name
+        if candidate.is_file():
+            return str(candidate.resolve())
     return None
 
 
@@ -291,7 +317,8 @@ def _require_pyappify_executable():
     if not pyappify_executable:
         raise FileNotFoundError(
             "PyAppify executable was not found. Set PYAPPIFY_EXECUTABLE to an "
-            "existing executable or place pyappify.exe in this directory or a parent directory."
+            "existing executable or place <app_name>.exe between the working directory "
+            "and the app root."
         )
     return pyappify_executable
 
@@ -385,6 +412,12 @@ def get_version_list(
     if not isinstance(release_only, bool):
         raise TypeError("release_only must be a boolean")
 
+    if not _is_supported_pyappify_version(pyappify_version):
+        raise RuntimeError(
+            "PyAppify does not support checking for updates for "
+            f"pyappify_version: {pyappify_version}"
+        )
+
     if "PYAPPIFY_PYTHON_TEST" in os.environ:
         if _wait_for_exit(exit_event, 5):
             _raise_if_exit_requested(exit_event)
@@ -404,6 +437,19 @@ def get_version_list(
     if not isinstance(response, list):
         raise RuntimeError("PyAppify returned an invalid version-list response")
     return response
+
+
+def _is_supported_pyappify_version(version):
+    """Return whether a PyAppify version is valid and supports version checks."""
+    if not isinstance(version, str) or not version:
+        return False
+
+    normalized = version[1:] if version.startswith("v") else version
+    parts = normalized.split(".")
+    if not parts or any(not part.isdigit() for part in parts):
+        return False
+
+    return tuple(int(part) for part in parts) >= (1, 2, 2)
 
 
 def get_versions(number_versions=10, release_only=True, timeout=120, exit_event=None):
