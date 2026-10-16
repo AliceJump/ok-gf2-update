@@ -1,6 +1,6 @@
 import os
 
-version = "v1.2.82"
+version = "v1.2.83"
 # 不需要修改version, Github Action打包会自动修改
 
 config = {
