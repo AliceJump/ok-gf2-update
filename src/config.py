@@ -3,7 +3,7 @@ import os
 from src.core.gf_interaction import GfInteraction
 from src.core.input_config import input_option
 
-version = "v1.2.94"
+version = "v1.2.95"
 # 不需要修改version, Github Action打包会自动修改
 
 config = {
